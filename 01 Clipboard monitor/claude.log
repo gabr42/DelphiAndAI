@@ -1,0 +1,114 @@
+Q> I want to create a Delphi application that would monitor clipboard content (on Windows) and append clipboard content to a log file each time the clipboard has changed (and has a text inside).
+
+
+A> Here's an example of how you can create a Delphi application that monitors clipboard changes and logs text content:
+
+```delphi
+unit MainForm;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
+  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls;
+
+type
+  TfrmMain = class(TForm)
+    btnStart: TButton;
+    btnStop: TButton;
+    memoLog: TMemo;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure btnStartClick(Sender: TObject);
+    procedure btnStopClick(Sender: TObject);
+  private
+    FNextViewer: HWND;
+    FLogFileName: string;
+    FMonitoring: Boolean;
+    procedure WMChangeCBChain(var Msg: TWMChangeCBChain); message WM_CHANGECBCHAIN;
+    procedure WMDrawClipboard(var Msg: TWMDrawClipboard); message WM_DRAWCLIPBOARD;
+    procedure LogClipboardContent;
+  public
+    { Public declarations }
+  end;
+
+var
+  frmMain: TfrmMain;
+
+implementation
+
+{$R *.dfm}
+
+procedure TfrmMain.FormCreate(Sender: TObject);
+begin
+  FLogFileName := ExtractFilePath(Application.ExeName) + 'clipboard_log.txt';
+  FMonitoring := False;
+  btnStop.Enabled := False;
+end;
+
+procedure TfrmMain.FormDestroy(Sender: TObject);
+begin
+  if FMonitoring then
+    ChangeClipboardChain(Handle, FNextViewer);
+end;
+
+procedure TfrmMain.btnStartClick(Sender: TObject);
+begin
+  FNextViewer := SetClipboardViewer(Handle);
+  FMonitoring := True;
+  btnStart.Enabled := False;
+  btnStop.Enabled := True;
+  memoLog.Lines.Add('Monitoring started...');
+end;
+
+procedure TfrmMain.btnStopClick(Sender: TObject);
+begin
+  ChangeClipboardChain(Handle, FNextViewer);
+  FMonitoring := False;
+  btnStart.Enabled := True;
+  btnStop.Enabled := False;
+  memoLog.Lines.Add('Monitoring stopped.');
+end;
+
+procedure TfrmMain.WMChangeCBChain(var Msg: TWMChangeCBChain);
+begin
+  if Msg.Remove = FNextViewer then
+    FNextViewer := Msg.Next
+  else if FNextViewer <> 0 then
+    SendMessage(FNextViewer, WM_CHANGECBCHAIN, Msg.Remove, Msg.Next);
+  inherited;
+end;
+
+procedure TfrmMain.WMDrawClipboard(var Msg: TWMDrawClipboard);
+begin
+  if FMonitoring then
+  begin
+    LogClipboardContent;
+    if FNextViewer <> 0 then
+      SendMessage(FNextViewer, WM_DRAWCLIPBOARD, 0, 0);
+  end;
+  inherited;
+end;
+
+procedure TfrmMain.LogClipboardContent;
+var
+  ClipText: string;
+  LogFile: TextFile;
+  TimeStamp: string;
+begin
+  if Clipboard.HasFormat(CF_TEXT) or Clipboard.HasFormat(CF_UNICODETEXT) then
+  try
+    ClipText := Clipboard.AsText;
+    if ClipText <> '' then
+    begin
+      TimeStamp := FormatDateTime('yyyy-mm-dd hh:nn:ss', Now);
+      
+      // Log to file
+      AssignFile(LogFile, FLogFileName);
+      if FileExists(FLogFileName) then
+        Append(LogFile)
+      else
+        Rewrite(LogFile);
+      try
+        WriteLn(LogFile, StringOfChar('-', 80));
+        WriteLn(LogFile, Format('[%s]', [TimeStamp

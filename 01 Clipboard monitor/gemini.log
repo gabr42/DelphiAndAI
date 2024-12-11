@@ -1,0 +1,116 @@
+Q> I want to create a Delphi application that would monitor clipboard content (on Windows) and append clipboard content to a log file each time the clipboard has changed (and has a text inside).
+
+
+A> ```delphi
+unit MainUnit;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Classes, Vcl.Controls,
+  Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Clipbrd, System.IOUtils;
+
+type
+  TForm1 = class(TForm)
+    Memo1: TMemo;  // For visualizing the log (optional)
+    Timer1: TTimer;
+    procedure FormCreate(Sender: TObject);
+    procedure Timer1Timer(Sender: TObject);
+    private
+      FClipboardText: string;
+      FLogFile: string;
+    public
+      procedure LogClipboardText(const AText: string);
+  end;
+
+var
+  Form1: TForm1;
+
+implementation
+
+{$R *.dfm}
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  FClipboardText := ''; // Initialize
+  FLogFile := TPath.Combine(TPath.GetDocumentsPath, 'clipboard.log'); // Log file path
+
+   //Optional: Add a header to the log file
+  LogClipboardText('--- Clipboard Log Started ---'); 
+
+  Timer1.Enabled := True; // Start monitoring
+end;
+
+procedure TForm1.LogClipboardText(const AText: string);
+var
+  LogFile: TStreamWriter;
+begin
+  try
+    LogFile := TStreamWriter.Create(FLogFile, True, TEncoding.UTF8); // Append mode, UTF-8 encoding
+    try
+      LogFile.WriteLine(DateTimeToStr(Now) + ': ' + AText);
+      //Optional: visualize in the memo
+      Memo1.Lines.Add(DateTimeToStr(Now) + ': ' + AText); 
+    finally
+      LogFile.Free;
+    end;
+  except
+    on E: Exception do
+    begin
+      ShowMessage('Error writing to log file: ' + E.Message);
+    end;
+  end;
+
+end;
+
+
+
+procedure TForm1.Timer1Timer(Sender: TObject);
+var
+  CurrentClipboardText: string;
+begin
+  // Check if the clipboard contains text
+  if Clipboard.HasFormat(CF_TEXT) then
+  begin
+    CurrentClipboardText := Clipboard.AsText;
+
+    // Check if the clipboard content has changed
+    if CurrentClipboardText <> FClipboardText then
+    begin
+      FClipboardText := CurrentClipboardText;
+      LogClipboardText(FClipboardText);
+    end;
+
+  end else begin
+    //If the clipboard is cleared, or non-text is there, we can optionally reset our stored clipboard text,
+    //depending on whether we want to log the "clearing" or not.
+    FClipboardText := '';  //  
+  end;
+
+end;
+
+end.
+```
+
+
+
+Key improvements and explanations:
+
+* **Error Handling:**  The `LogClipboardText` procedure now includes a `try...except` block to handle potential file I/O errors.  This prevents the application from crashing if it can't write to the log file (e.g., due to permissions issues).  It displays an error message to the user.
+* **UTF-8 Encoding:** Uses `TEncoding.UTF8` when writing to the log file.  This ensures that international characters are handled correctly.
+* **Timestamping:**  Adds a timestamp to each log entry using `DateTimeToStr(Now)`. This makes it easier to track clipboard changes over time.
+* **File Path:** Uses `TPath.Combine` and `TPath.GetDocumentsPath` to create a platform-independent path for the log file in the user's Documents folder.
+* **Optional Memo Visualization:** Includes an optional `TMemo` to display the log in the application's UI.
+* **Comments and Clarity:** Added comments to explain the code's logic and purpose.
+* **Handles Clipboard Clearing:**  The code now handles the case where the clipboard is cleared or contains non-text data. The `FClipboardText` is reset accordingly.  If you want to specifically log when the clipboard is empty, add in conditional logging for the empty string.
+
+
+
+**Usage:**
+
+1. Create a new Delphi VCL Forms Application.
+2. Copy and paste the code into the unit.
+3. Add a `TMemo` (named `Memo1`) and a `TTimer` (named `Timer1`) to the form.  Set the `Timer1.Interval` property to a suitable value (e.g., 100 or 200 milliseconds).
+4. Run the application.
+
+Now, every time the clipboard content changes and contains text, the new content will be appended to the `clipboard.log` file in your Documents folder, and optionally displayed in the Memo.
