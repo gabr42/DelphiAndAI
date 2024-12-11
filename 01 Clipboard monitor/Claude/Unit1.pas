@@ -1,15 +1,11 @@
-Q> I want to create a Delphi application that would monitor clipboard content (on Windows) and append clipboard content to a log file each time the clipboard has changed (and has a text inside).
-
-A> Here's an example of how you can create a Delphi application that monitors clipboard changes and logs text content:
-
-```delphi
-unit MainForm;
+unit Unit1;
 
 interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
-  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls;
+  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls,
+  Vcl.Clipbrd; // *** added missing unit
 
 type
   TfrmMain = class(TForm)
@@ -96,7 +92,7 @@ begin
   if FMonitoring then
   begin
     LogClipboardContent;
-    
+
     // Pass the message to the next viewer in the chain
     if FNextViewer <> 0 then
       SendMessage(FNextViewer, WM_DRAWCLIPBOARD, 0, 0);
@@ -112,7 +108,7 @@ begin
     if Clipboard.HasFormat(CF_TEXT) then
     begin
       ClipText := Clipboard.AsText;
-      
+
       // Log to file
       AssignFile(LogFile, FLogFileName);
       if FileExists(FLogFileName) then
@@ -135,72 +131,4 @@ begin
 end;
 
 end.
-```
 
-And here's the corresponding form design (DFM):
-
-```delphi
-object frmMain: TfrmMain
-  Left = 0
-  Top = 0
-  Caption = 'Clipboard Monitor'
-  ClientHeight = 300
-  ClientWidth = 400
-  Color = clBtnFace
-  Font.Charset = DEFAULT_CHARSET
-  Font.Color = clWindowText
-  Font.Height = -11
-  Font.Name = 'Tahoma'
-  Font.Style = []
-  OnCreate = FormCreate
-  OnDestroy = FormDestroy
-  TextHeight = 13
-  object btnStart: TButton
-    Left = 8
-    Top = 8
-    Width = 75
-    Height = 25
-    Caption = 'Start'
-    TabOrder = 0
-    OnClick = btnStartClick
-  end
-  object btnStop: TButton
-    Left = 89
-    Top = 8
-    Width = 75
-    Height = 25
-    Caption = 'Stop'
-    TabOrder = 1
-    OnClick = btnStopClick
-  end
-  object mmoLog: TMemo
-    Left = 8
-    Top = 39
-    Width = 384
-    Height = 253
-    ScrollBars = ssVertical
-    TabOrder = 2
-  end
-end
-```
-
-This application:
-
-1. Creates a window that can monitor clipboard changes using the Windows Clipboard Viewer Chain
-2. Has Start/Stop buttons to control the monitoring
-3. Shows a log in a memo control on the form
-4. Writes clipboard text content to a log file with timestamps
-5. Handles clipboard chain properly to work alongside other clipboard monitoring applications
-
-To use it:
-
-1. Create a new VCL Forms Application
-2. Copy and paste the code into the unit
-3. Set up the form as shown in the DFM
-4. Run the application
-5. Click "Start" to begin monitoring
-6. Any text copied to the clipboard will be logged both to the memo and to a log file
-
-The log file will be created in the same directory as the executable, with the same name but with a .log extension.
-
-Note that this only monitors text content in the clipboard. If you need to monitor other types of clipboard content (images, files, etc.), you'll need to add additional checks and handling for those formats.

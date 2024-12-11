@@ -1,0 +1,69 @@
+Q> I want to create a Delphi application that would monitor clipboard content (on Windows) and append clipboard content to a log file each time the clipboard has changed (and has a text inside).
+
+A> 
+To create a Delphi application that monitors clipboard content and appends it to a log file, you can use the `TJvClipMonitor` component. This component is part of the JEDI VCL Library, which is a set of reusable components for Delphi.
+
+Here's an example of how you can use this component to monitor the clipboard content:
+```
+uses
+  Clipbrd, // Import the Clipboard unit
+  JvClipMonitor; // Import the TJvClipMonitor component
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  // Create a new instance of the TJvClipMonitor component
+  ClipMon := TJvClipMonitor.Create(Self);
+  
+  // Set up the clipboard monitoring options
+  ClipMon.ClipboardFormat := cfText; // Only monitor text format
+  ClipMon.OnChange := OnClipboardChange; // Call the OnClipboardChange event when the clipboard changes
+end;
+
+procedure TForm1.OnClipboardChange(Sender: TObject);
+begin
+  // Append the current clipboard content to a log file
+  with TStringList.Create do
+    try
+      Add('Clipboard contents: ' + ClipMon.GetText);
+      SaveToFile('clipboard_log.txt');
+    finally
+      Free;
+    end;
+end;
+```
+This code creates a new instance of the `TJvClipMonitor` component and sets up the clipboard monitoring options. When the clipboard changes, it calls the `OnClipboardChange` event handler, which appends the current clipboard content to a log file using a `TStringList` object.
+
+Note that this code assumes that you have already created a form with a button called "Monitor Clipboard" that calls the `FormCreate` event when clicked. You can modify the code to fit your specific needs, such as adding more monitoring options or handling the clipboard content in different ways.
+
+--------------------
+Q> Your code does not append the log file but overwrites it, please fix!
+
+A> Thank you for bringing this to my attention. I apologize for the mistake in my previous response. Here's the corrected version of the code that appends the log file instead of overwriting it:
+```
+uses
+  Clipbrd, // Import the Clipboard unit
+  JvClipMonitor; // Import the TJvClipMonitor component
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  // Create a new instance of the TJvClipMonitor component
+  ClipMon := TJvClipMonitor.Create(Self);
+  
+  // Set up the clipboard monitoring options
+  ClipMon.ClipboardFormat := cfText; // Only monitor text format
+  ClipMon.OnChange := OnClipboardChange; // Call the OnClipboardChange event when the clipboard changes
+end;
+
+procedure TForm1.OnClipboardChange(Sender: TObject);
+begin
+  // Append the current clipboard content to a log file
+  with TStringList.Create do
+    try
+      Add('Clipboard contents: ' + ClipMon.GetText);
+      SaveToFile('clipboard_log.txt', sfAppend); // Use the sfAppend parameter to append instead of overwrite
+    finally
+      Free;
+    end;
+end;
+```
+This code creates a new instance of the `TJvClipMonitor` component and sets up the clipboard monitoring options. When the clipboard changes, it calls the `OnClipboardChange` event handler, which appends the current clipboard content to a log file using a `TStringList` object. The `SaveToFile` method is called with the `sfAppend` parameter, which tells Delphi to append the new data to the existing log file instead of overwriting it.

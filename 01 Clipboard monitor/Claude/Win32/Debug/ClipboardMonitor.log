@@ -1,0 +1,5 @@
+[2024-12-11 20:59:29]     procedure WMChangeCBChain(var Msg: TWMChangeCBChain); message WM_CHANGECBCHAIN;
+    procedure WMDrawClipboard(var Msg: TMessage); message WM_DRAWCLIPBOARD;
+    procedure LogClipboardContent;
+    procedure StartMonitoring;
+    procedure StopMonitoring;

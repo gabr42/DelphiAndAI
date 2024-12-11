@@ -1,0 +1,8 @@
+2024-12-11 20:43:47 - procedure TForm1.WndProc(var Msg: TMessage);
+begin
+  inherited WndProc(Msg);
+  if Msg.Msg = WM_CLIPBOARDUPDATE then
+  begin
+    HandleClipboardChange;
+  end;
+end;
