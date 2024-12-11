@@ -81,3 +81,5 @@ __recovery/
 modules/
 
 questions.txt
+
+*.dsv
