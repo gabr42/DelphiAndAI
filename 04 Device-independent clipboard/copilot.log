@@ -1,0 +1,23 @@
+To copy text to the clipboard in a Delphi Firemonkey application, you can use the IFMXClipboardService interface. Here's a simple example of how you can do this:
+
+procedure TFormMain.ButtonCopyClick(Sender: TObject);
+var
+  ClipboardService: IFMXClipboardService;
+begin
+  if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService) then
+  begin
+    ClipboardService := IFMXClipboardService(TPlatformServices.Current.GetPlatformService(IFMXClipboardService));
+    ClipboardService.SetClipboard(Memo1.Text); // Replace Memo1.Text with the text you want to copy
+  end;
+end;
+In this example:
+
+Check if the platform supports the clipboard service using SupportsPlatformService.
+Get the clipboard service using GetPlatformService.
+Set the clipboard content using SetClipboard[1][2].
+This code snippet assumes you have a TButton named ButtonCopy and a TMemo named Memo1 on your form. When the button is clicked, the text from Memo1 is copied to the clipboard.
+
+Feel free to ask if you need more details or have any other questions!
+
+[1] https://andydunkel.net/snippets/Delphi/Copy_Text_to_Clipboard/index.html
+[2] https://docwiki.embarcadero.com/CodeExamples/Sydney/en/FMX.CopyPaste_Sample

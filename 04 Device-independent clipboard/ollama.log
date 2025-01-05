@@ -1,0 +1,29 @@
+Q> How can I copy text to clipboard in a Delphi Firemonkey application?
+
+A> 
+To copy text to the clipboard in a Delphi Firemonkey application, you can use the `TClipboard` class provided by the Firemonkey framework. This class provides a simple way to interact with the system's clipboard, and it works on both Windows and macOS platforms.
+
+Here is an example of how to copy text to the clipboard using `TClipboard`:
+```
+procedure TForm1.Button1Click(Sender: TObject);
+var
+  Clipboard: TClipboard;
+begin
+  Clipboard := TClipboard.Create;
+  try
+    // Copy some text to the clipboard
+    Clipboard.SetText('Hello, world!');
+  finally
+    Clipboard.Free;
+  end;
+end;
+```
+This code creates a `TClipboard` object and sets its text property to the string "Hello, world!" using the `SetText` method. When the procedure is finished executing, the clipboard object is freed.
+
+Note that the `TClipboard` class also provides other methods for working with the clipboard, such as `GetText`, which retrieves the current text in the clipboard, and `HasFormat`, which checks if a specific data format is available in the clipboard. You can use these methods to further customize your clipboard handling code.
+
+--------------------
+Q> In which unit is this TClipboard class defined?
+
+A> 
+The `TClipboard` class is defined in the `FMX.Platform` unit, which is part of the Firemonkey framework. This unit provides a set of platform-specific classes and methods that are used to interact with the operating system and hardware resources. The `TClipboard` class is one of the key components of the Firemonkey framework, and it is used by many other units and classes in the framework to provide cross-platform clipboard support.

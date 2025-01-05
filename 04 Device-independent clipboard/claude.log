@@ -1,0 +1,132 @@
+Q> How can I copy text to clipboard in a Delphi Firemonkey application?
+
+A> In a FireMonkey application, you can copy text to the clipboard using either the `Clipboard` service or the `IFMXClipboardService` interface. Here are a few ways to do it:
+
+1. Using `Clipboard` (simplest method):
+```delphi
+uses
+  FMX.Platform;
+
+procedure CopyToClipboard(const Text: string);
+begin
+  Clipboard.AsText := Text;
+end;
+```
+
+2. Using `IFMXClipboardService` (more detailed approach):
+```delphi
+uses
+  FMX.Platform;
+
+procedure CopyToClipboard(const Text: string);
+var
+  ClipboardService: IFMXClipboardService;
+begin
+  if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, ClipboardService) then
+  begin
+    ClipboardService.SetClipboard(Text);
+  end;
+end;
+```
+
+3. With error handling:
+```delphi
+uses
+  FMX.Platform, System.SysUtils;
+
+function TryCopyToClipboard(const Text: string; out Error: string): Boolean;
+var
+  ClipboardService: IFMXClipboardService;
+begin
+  Result := False;
+  Error := '';
+  
+  try
+    if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, ClipboardService) then
+    begin
+      ClipboardService.SetClipboard(Text);
+      Result := True;
+    end
+    else
+      Error := 'Clipboard service not available';
+  except
+    on E: Exception do
+    begin
+      Error := E.Message;
+      Result := False;
+    end;
+  end;
+end;
+
+// Usage example:
+procedure TForm1.Button1Click(Sender: TObject);
+var
+  ErrorMsg: string;
+begin
+  if not TryCopyToClipboard('Text to copy', ErrorMsg) then
+    ShowMessage('Failed to copy to clipboard: ' + ErrorMsg);
+end;
+```
+
+4. Reading from clipboard:
+```delphi
+uses
+  FMX.Platform;
+
+function GetClipboardText: string;
+var
+  ClipboardService: IFMXClipboardService;
+begin
+  Result := '';
+  if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, ClipboardService) then
+  begin
+    Result := ClipboardService.GetClipboard.ToString;
+  end;
+end;
+```
+
+5. Complete example with copy and paste functionality:
+```delphi
+uses
+  FMX.Platform;
+
+type
+  TForm1 = class(TForm)
+    Button1: TButton;
+    Button2: TButton;
+    Memo1: TMemo;
+    procedure Button1Click(Sender: TObject);
+    procedure Button2Click(Sender: TObject);
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+implementation
+
+{$R *.fmx}
+
+procedure TForm1.Button1Click(Sender: TObject);  // Copy button
+begin
+  if not Memo1.SelText.IsEmpty then
+    Clipboard.AsText := Memo1.SelText
+  else
+    Clipboard.AsText := Memo1.Text;
+end;
+
+procedure TForm1.Button2Click(Sender: TObject);  // Paste button
+var
+  ClipboardService: IFMXClipboardService;
+begin
+  if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, ClipboardService) then
+  begin
+    if not ClipboardService.GetClipboard.ToString.IsEmpty then
+      Memo1.Text := ClipboardService.GetClipboard.ToString;
+  end;
+end;
+```
+
+Remember that clipboard operations might be platform-specific, and some platforms (especially mobile) might have limitations or specific requirements. The FireMonkey framework handles most of these differences, but it's good practice to add error handling when working with the clipboard.
+
+Also note that for mobile platforms (iOS and Android), there might be additional considerations regarding clipboard access and security restrictions.

@@ -1,0 +1,256 @@
+Q> How can I copy text to clipboard in a Delphi Firemonkey application?
+
+A> To copy text to the clipboard in a Delphi FireMonkey (FMX) application, you can utilize the `IFMXClipboardService` interface provided by the FireMonkey platform services. This approach ensures compatibility across different platforms that FireMonkey supports (Windows, macOS, iOS, Android, etc.).
+
+Below is a comprehensive guide with code examples to help you implement clipboard functionality in your FMX application.
+
+---
+
+### **1. Using `IFMXClipboardService`**
+
+**Step-by-Step Guide:**
+
+1. **Include Necessary Units:**
+
+   Ensure that your unit includes the required units in the `uses` clause:
+
+   ```delphi
+   uses
+     System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
+     FMX.Types, FMX.Controls, FMX.Forms, FMX.Dialogs, FMX.StdCtrls, FMX.Platform;
+   ```
+
+2. **Implement Clipboard Copy Functionality:**
+
+   Here's how you can copy text to the clipboard when a button is clicked:
+
+   ```delphi
+   procedure TForm1.ButtonCopyClick(Sender: TObject);
+   var
+     ClipboardService: IFMXClipboardService;
+     TextToCopy: string;
+   begin
+     TextToCopy := Edit1.Text; // Assuming you have an Edit control named Edit1
+
+     // Check if the clipboard service is available
+     if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, IInterface(ClipboardService)) then
+     begin
+       ClipboardService.SetClipboard(TextToCopy); // Set text to clipboard
+       ShowMessage('Text copied to clipboard.');
+     end
+     else
+       ShowMessage('Clipboard service not available.');
+   end;
+   ```
+
+3. **Reading Text from the Clipboard:**
+
+   Similarly, to retrieve text from the clipboard:
+
+   ```delphi
+   procedure TForm1.ButtonPasteClick(Sender: TObject);
+   var
+     ClipboardService: IFMXClipboardService;
+     ClipboardText: string;
+   begin
+     // Check if the clipboard service is available
+     if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, IInterface(ClipboardService)) then
+     begin
+       ClipboardService.GetClipboard(ClipboardText); // Get text from clipboard
+       Edit1.Text := ClipboardText; // Assuming you have an Edit control named Edit1
+     end
+     else
+       ShowMessage('Clipboard service not available.');
+   end;
+   ```
+
+**Explanation:**
+
+- **`TPlatformServices.Current.SupportsPlatformService`**: This method checks if the platform supports the specified service (`IFMXClipboardService` in this case) and retrieves the service interface if available.
+
+- **`SetClipboard`**: Method of `IFMXClipboardService` to copy text to the clipboard.
+
+- **`GetClipboard`**: Method of `IFMXClipboardService` to retrieve text from the clipboard.
+
+---
+
+### **2. Using the `FMX.Clipboard` Unit (Available in Newer Delphi Versions)**
+
+If you're using a newer version of Delphi that includes the `FMX.Clipboard` unit, you can simplify clipboard operations using the `TClipboard` class.
+
+**Step-by-Step Guide:**
+
+1. **Include the `FMX.Clipboard` Unit:**
+
+   ```delphi
+   uses
+     FMX.Clipboard;
+   ```
+
+2. **Implement Clipboard Copy Functionality:**
+
+   ```delphi
+   procedure TForm1.ButtonCopyClick(Sender: TObject);
+   begin
+     TClipboard.SetText(Edit1.Text); // Copy text from Edit1 to clipboard
+     ShowMessage('Text copied to clipboard.');
+   end;
+   ```
+
+3. **Reading Text from the Clipboard:**
+
+   ```delphi
+   procedure TForm1.ButtonPasteClick(Sender: TObject);
+   begin
+     Edit1.Text := TClipboard.GetText; // Paste text from clipboard to Edit1
+   end;
+   ```
+
+**Notes:**
+
+- The `TClipboard` class provides a straightforward API for clipboard operations, making the code cleaner and easier to maintain.
+
+- Ensure that the `FMX.Clipboard` unit is available in your Delphi version. If not, use the `IFMXClipboardService` approach as described earlier.
+
+---
+
+### **3. Complete Example**
+
+Below is a complete example of a simple FMX application with an `Edit` control and two buttons: one to copy text to the clipboard and another to paste text from the clipboard.
+
+**Design:**
+
+- **Components:**
+  - `TEdit` (Name: `Edit1`)
+  - `TButton` (Name: `ButtonCopy`, Text: `Copy`)
+  - `TButton` (Name: `ButtonPaste`, Text: `Paste`)
+
+**Code:**
+
+```delphi
+unit Unit1;
+
+interface
+
+uses
+  System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
+  FMX.Types, FMX.Controls, FMX.Forms, FMX.Dialogs, FMX.StdCtrls,
+  FMX.Platform, FMX.Clipboard; // Include FMX.Clipboard if available
+
+type
+  TForm1 = class(TForm)
+    Edit1: TEdit;
+    ButtonCopy: TButton;
+    ButtonPaste: TButton;
+    procedure ButtonCopyClick(Sender: TObject);
+    procedure ButtonPasteClick(Sender: TObject);
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  Form1: TForm1;
+
+implementation
+
+{$R *.fmx}
+
+procedure TForm1.ButtonCopyClick(Sender: TObject);
+begin
+  // Option 1: Using IFMXClipboardService
+  /*
+  var
+    ClipboardService: IFMXClipboardService;
+    TextToCopy: string;
+  begin
+    TextToCopy := Edit1.Text;
+    if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, IInterface(ClipboardService)) then
+    begin
+      ClipboardService.SetClipboard(TextToCopy);
+      ShowMessage('Text copied to clipboard.');
+    end
+    else
+      ShowMessage('Clipboard service not available.');
+  end;
+  */
+
+  // Option 2: Using TClipboard (if available)
+  TClipboard.SetText(Edit1.Text);
+  ShowMessage('Text copied to clipboard.');
+end;
+
+procedure TForm1.ButtonPasteClick(Sender: TObject);
+begin
+  // Option 1: Using IFMXClipboardService
+  /*
+  var
+    ClipboardService: IFMXClipboardService;
+    ClipboardText: string;
+  begin
+    if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, IInterface(ClipboardService)) then
+    begin
+      ClipboardService.GetClipboard(ClipboardText);
+      Edit1.Text := ClipboardText;
+    end
+    else
+      ShowMessage('Clipboard service not available.');
+  end;
+  */
+
+  // Option 2: Using TClipboard (if available)
+  Edit1.Text := TClipboard.GetText;
+end;
+
+end.
+```
+
+**Explanation:**
+
+- **Option 1 (Commented Out):** Demonstrates how to use the `IFMXClipboardService` interface for clipboard operations. This method is more general and works across all platforms supported by FireMonkey.
+
+- **Option 2:** Utilizes the `TClipboard` class from the `FMX.Clipboard` unit, providing a simpler API for clipboard tasks.
+
+**Choosing Between Options:**
+
+- If your Delphi version supports the `FMX.Clipboard` unit and the `TClipboard` class, it's recommended to use this approach for its simplicity.
+
+- If not, or if you need more control over clipboard operations, use the `IFMXClipboardService` interface.
+
+---
+
+### **4. Additional Considerations**
+
+- **Cross-Platform Compatibility:** FireMonkey abstracts platform-specific implementations, ensuring that clipboard operations work seamlessly across Windows, macOS, iOS, Android, and other supported platforms.
+
+- **Error Handling:** Always check if the clipboard service is available before performing clipboard operations to avoid runtime errors, especially on platforms with restricted clipboard access.
+
+- **Security and Permissions:**
+  - On some platforms (e.g., mobile), accessing the clipboard might require specific permissions or user interactions.
+  - Ensure your application complies with platform guidelines regarding clipboard usage to provide a smooth user experience.
+
+- **Unicode Support:** FireMonkey handles Unicode strings, so copying and pasting text with various character sets should work without issues.
+
+---
+
+### **5. Troubleshooting**
+
+- **Clipboard Not Working:**
+  - Ensure that your application has the necessary permissions, especially on mobile platforms.
+  - Verify that the `FMX.Clipboard` unit is included if you're using the `TClipboard` class.
+  - Check if the clipboard text is being set or retrieved correctly by using debug messages or breakpoints.
+
+- **Platform-Specific Issues:**
+  - Some platforms may have unique behaviors or restrictions related to clipboard operations. Always test clipboard functionality on all target platforms.
+
+---
+
+By following the steps and using the code examples provided above, you should be able to implement clipboard copy (and paste) functionality in your Delphi FireMonkey applications effectively.
+
+---
+
+**References:**
+
+- [Embarcadero Documentation - Clipboard in FireMonkey](https://docwiki.embarcadero.com/RADStudio/en/Working_with_the_Clipboard_(FireMonkey))
+- [FireMonkey Platform Services](https://docwiki.embarcadero.com/RADStudio/en/Platform_Services_(FireMonkey))
