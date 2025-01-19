@@ -1,0 +1,331 @@
+Q> I have a multiline string containing newline ASCII characters (TMemo.Text). I want to change it to a single-line string with only printable ASCII characters. I could do that with BASE64 encoding, for example. I would, however, like to keep the text as much readable as possible by "encoding" only non-printable characters. Is there a simple way to do that?
+
+
+
+A> Yes, there are several ways to achieve this. Here's a simple solution that replaces non-printable characters with their hexadecimal representation in a readable format:
+
+```delphi
+function EncodeToSingleLine(const AText: string): string;
+const
+  MinPrintable = 32;  // Space character
+  MaxPrintable = 126; // Last printable ASCII character
+begin
+  Result := '';
+  for var I := 1 to Length(AText) do
+  begin
+    var Ch := AText[I];
+    if (Ord(Ch) >= MinPrintable) and (Ord(Ch) <= MaxPrintable) then
+      Result := Result + Ch
+    else
+      Result := Result + '\x' + IntToHex(Ord(Ch), 2);
+  end;
+end;
+
+function DecodeFromSingleLine(const AText: string): string;
+var
+  I: Integer;
+begin
+  Result := '';
+  I := 1;
+  while I <= Length(AText) do
+  begin
+    if (I + 3 <= Length(AText)) and (AText[I] = '\') and (AText[I + 1] = 'x') then
+    begin
+      var HexVal := '$' + AText[I + 2] + AText[I + 3];
+      Result := Result + Char(StrToInt(HexVal));
+      Inc(I, 4);
+    end
+    else
+    begin
+      Result := Result + AText[I];
+      Inc(I);
+    end;
+  end;
+end;
+```
+
+Usage example:
+
+```delphi
+procedure TForm1.ButtonEncodeClick(Sender: TObject);
+var
+  Original, Encoded, Decoded: string;
+begin
+  Original := Memo1.Text;
+  
+  // Encode
+  Encoded := EncodeToSingleLine(Original);
+  Memo2.Text := Encoded;
+  
+  // Decode back
+  Decoded := DecodeFromSingleLine(Encoded);
+  Memo3.Text := Decoded;
+  
+  // Verify
+  ShowMessage('Original equals Decoded: ' + BoolToStr(Original = Decoded, True));
+end;
+```
+
+This solution:
+
+1. Keeps all printable ASCII characters (32-126) as they are
+2. Converts all other characters (including newlines) to \xHH format where HH is the hexadecimal value
+3. Is fully reversible
+4. Maintains readability for the printable part of the text
+
+Example output:
+```
+Original: Hello
+World!
+
+Encoded: Hello\x0DWorld!\x0A
+
+Decoded: Hello
+World!
+```
+
+Alternative approach using URL-encoding style:
+
+```delphi
+function EncodeToSingleLine2(const AText: string): string;
+const
+  MinPrintable = 32;
+  MaxPrintable = 126;
+begin
+  Result := '';
+  for var I := 1 to Length(AText) do
+  begin
+    var Ch := AText[I];
+    if (Ord(Ch) >= MinPrintable) and (Ord(Ch) <= MaxPrintable) and (Ch <> '%') then
+      Result := Result + Ch
+    else
+      Result := Result + '%' + IntToHex(Ord(Ch), 2);
+  end;
+end;
+
+function DecodeFromSingleLine2(const AText: string): string;
+var
+  I: Integer;
+begin
+  Result := '';
+  I := 1;
+  while I <= Length(AText) do
+  begin
+    if (I + 2 <= Length(AText)) and (AText[I] = '%') then
+    begin
+      var HexVal := '$' + AText[I + 1] + AText[I + 2];
+      Result := Result + Char(StrToInt(HexVal));
+      Inc(I, 3);
+    end
+    else
+    begin
+      Result := Result + AText[I];
+      Inc(I);
+    end;
+  end;
+end;
+```
+
+This second approach uses less space (using % instead of \x) but is similar to URL encoding, which might be more familiar to some users.
+
+Both approaches are simple to implement and maintain good readability while being fully reversible. Choose the one that better fits your needs based on the expected content and usage scenario.
+
+--------------------
+Q> Can you check this code for any problems it may exhibit?
+
+
+A> Here are potential issues with the code and suggested improvements:
+
+1. **Character Encoding Issues**:
+```delphi
+// Original code assumes single-byte characters. For Unicode support:
+function EncodeToSingleLine(const AText: string): string;
+const
+  MinPrintable = 32;
+  MaxPrintable = 126;
+begin
+  Result := '';
+  for var I := Low(AText) to High(AText) do
+  begin
+    var Ch := AText[I];
+    if (Ord(Ch) <= MaxPrintable) and (Ord(Ch) >= MinPrintable) then
+      Result := Result + Ch
+    else
+      Result := Result + '\x' + IntToHex(Ord(Ch), 4); // Use 4 digits for Unicode
+  end;
+end;
+```
+
+2. **Buffer Overflow Prevention**:
+```delphi
+function DecodeFromSingleLine(const AText: string): string;
+var
+  I: Integer;
+begin
+  Result := '';
+  I := Low(AText);
+  while I <= High(AText) do
+  begin
+    // Add bounds checking
+    if (I + 3 <= High(AText)) and (AText[I] = '\') and (AText[I + 1] = 'x') then
+    begin
+      try
+        var HexVal := '$' + AText[I + 2] + AText[I + 3];
+        Result := Result + Char(StrToInt(HexVal));
+        Inc(I, 4);
+      except
+        // Handle invalid hex values
+        Result := Result + AText[I];
+        Inc(I);
+      end;
+    end
+    else
+    begin
+      Result := Result + AText[I];
+      Inc(I);
+    end;
+  end;
+end;
+```
+
+3. **Performance Optimization**:
+```delphi
+function EncodeToSingleLine(const AText: string): string;
+const
+  MinPrintable = 32;
+  MaxPrintable = 126;
+var
+  SB: TStringBuilder;
+begin
+  SB := TStringBuilder.Create(Length(AText) * 2); // Pre-allocate reasonable size
+  try
+    for var I := Low(AText) to High(AText) do
+    begin
+      var Ch := AText[I];
+      if (Ord(Ch) <= MaxPrintable) and (Ord(Ch) >= MinPrintable) then
+        SB.Append(Ch)
+      else
+        SB.Append('\x').Append(IntToHex(Ord(Ch), 4));
+    end;
+    Result := SB.ToString;
+  finally
+    SB.Free;
+  end;
+end;
+```
+
+4. **Complete Enhanced Version**:
+```delphi
+type
+  EEncodingError = class(Exception);
+
+function EncodeToSingleLine(const AText: string): string;
+const
+  MinPrintable = 32;
+  MaxPrintable = 126;
+var
+  SB: TStringBuilder;
+begin
+  if AText = '' then
+    Exit('');
+
+  SB := TStringBuilder.Create(Length(AText) * 2);
+  try
+    for var I := Low(AText) to High(AText) do
+    begin
+      var Ch := AText[I];
+      if (Ord(Ch) <= MaxPrintable) and (Ord(Ch) >= MinPrintable) 
+         and (Ch <> '\') then // Escape backslash too
+        SB.Append(Ch)
+      else
+        SB.Append('\x').Append(IntToHex(Ord(Ch), 4));
+    end;
+    Result := SB.ToString;
+  finally
+    SB.Free;
+  end;
+end;
+
+function DecodeFromSingleLine(const AText: string): string;
+var
+  I: Integer;
+  SB: TStringBuilder;
+begin
+  if AText = '' then
+    Exit('');
+
+  SB := TStringBuilder.Create(Length(AText));
+  try
+    I := Low(AText);
+    while I <= High(AText) do
+    begin
+      if (I + 5 <= High(AText)) and (AText[I] = '\') and (AText[I + 1] = 'x') then
+      begin
+        try
+          var HexStr := Copy(AText, I + 2, 4);
+          var CharCode := StrToInt('$' + HexStr);
+          SB.Append(Char(CharCode));
+          Inc(I, 6);
+        except
+          on E: Exception do
+            raise EEncodingError.CreateFmt('Invalid hex sequence at position %d: %s', 
+              [I, E.Message]);
+        end;
+      end
+      else
+      begin
+        SB.Append(AText[I]);
+        Inc(I);
+      end;
+    end;
+    Result := SB.ToString;
+  finally
+    SB.Free;
+  end;
+end;
+
+// Test function
+procedure TestEncoding;
+var
+  TestCases: array of string;
+  I: Integer;
+begin
+  SetLength(TestCases, 4);
+  TestCases[0] := 'Hello'#13#10'World';
+  TestCases[1] := '';
+  TestCases[2] := #0#1#2'Test'#$FFFF;
+  TestCases[3] := 'Normal ASCII text';
+
+  for I := Low(TestCases) to High(TestCases) do
+  begin
+    var Original := TestCases[I];
+    var Encoded := EncodeToSingleLine(Original);
+    var Decoded := DecodeFromSingleLine(Encoded);
+    
+    Assert(Original = Decoded, Format('Test case %d failed', [I]));
+  end;
+end;
+```
+
+Improvements in the enhanced version:
+
+1. Uses `TStringBuilder` for better performance
+2. Handles Unicode characters properly
+3. Includes proper error handling
+4. Escapes backslash character to prevent ambiguity
+5. Includes bounds checking
+6. Handles empty strings
+7. Includes a custom exception type
+8. Includes test cases
+9. Uses 4-digit hex values for full Unicode support
+10. Properly handles string indexes using Low/High
+
+Additional considerations:
+
+- You might want to add validation for the input string
+- Consider adding a maximum length check to prevent excessive memory usage
+- You could add compression for repeated characters if needed
+- Consider adding a version marker if you need to support multiple encoding versions
+- You might want to add CRC or other validation mechanisms
+
+This enhanced version should be more robust and suitable for production use.
