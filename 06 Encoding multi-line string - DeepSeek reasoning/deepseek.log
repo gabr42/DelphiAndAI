@@ -1,0 +1,253 @@
+Q> I have a multiline string containing newline ASCII characters (TMemo.Text). I want to change it to a single-line string with only printable ASCII characters. I could do that with BASE64 encoding, for example. I would, however, like to keep the text as much readable as possible by "encoding" only non-printable characters. Is there a simple way to do that?
+
+A> To convert a multiline string with non-printable characters into a single-line readable string while encoding only non-printables, you can use escape sequences. Here's a Delphi implementation:
+
+**Step 1: Encode Non-Printable Characters**
+```delphi
+function EncodeNonPrintables(const S: string): string;
+var
+  i: Integer;
+  c: Char;
+begin
+  Result := '';
+  for i := 1 to Length(S) do
+  begin
+    c := S[i];
+    case Ord(c) of
+      9:   Result := Result + '\t';   // Tab
+      10:  Result := Result + '\n';   // LF (New Line)
+      13:  Result := Result + '\r';   // CR (Carriage Return)
+      92:  Result := Result + '\\';   // Backslash
+      32..126: Result := Result + c;  // Printable ASCII
+    else
+      Result := Result + '\x' + IntToHex(Ord(c), 2); // Hex escape for others
+    end;
+  end;
+end;
+```
+
+**Step 2: Decode Back to Original**
+```delphi
+function DecodeNonPrintables(const S: string): string;
+var
+  i: Integer;
+  c: Char;
+  HexStr: string;
+  Code: Integer;
+begin
+  Result := '';
+  i := 1;
+  while i <= Length(S) do
+  begin
+    c := S[i];
+    if c = '\' then
+    begin
+      Inc(i);
+      if i > Length(S) then Break;
+      c := S[i];
+      case c of
+        't':  Result := Result + #9;
+        'n':  Result := Result + #10;
+        'r':  Result := Result + #13;
+        '\':  Result := Result + '\';
+        'x':
+          begin
+            if i + 2 <= Length(S) then
+            begin
+              HexStr := Copy(S, i+1, 2);
+              if TryStrToInt('$' + HexStr, Code) then
+              begin
+                Result := Result + Chr(Code);
+                Inc(i, 2);
+              end;
+            end;
+          end;
+        else  // Handle unknown escapes as literal
+          Result := Result + '\' + c;
+      end;
+      Inc(i);
+    end
+    else
+    begin
+      Result := Result + c;
+      Inc(i);
+    end;
+  end;
+end;
+```
+
+**Usage Example:**
+```delphi
+var
+  Original, Encoded, Decoded: string;
+begin
+  Original := 'Hello'#13#10'World'#9'!'; // Contains CRLF and Tab
+  Encoded := EncodeNonPrintables(Original);
+  // Encoded becomes 'Hello\r\nWorld\t!'
+  
+  Decoded := DecodeNonPrintables(Encoded);
+  // Decoded restores original string with CRLF and Tab
+end;
+```
+
+**Key Features:**
+- Encodes non-printable ASCII (chars < 32) using readable escapes (`\t`, `\n`, `\r`)
+- Handles backslashes (`\\`) to ensure reversibility
+- Uses `\xHH` format for uncommon non-printables
+- Keeps printable ASCII (32-126) unchanged for readability
+
+This approach maintains maximum readability while ensuring the string becomes single-line and reversible.
+
+R> Okay, the user wants to convert a multiline string with newlines into a single-line string, keeping it as readable as possible. They mentioned using Base64 but prefer encoding only non-printable characters. Let me think about how to approach this in Delphi.
+
+First, I need to identify which characters are considered printable. Typically, ASCII 32 (space) to 126 (~) are printable. So, non-printable would be below 32, including newlines (10 and 13), and 127 is DEL, which is also non-printable. The user wants to encode these non-printables, maybe using some escape sequences, while leaving the rest as is.
+
+So the plan is: iterate through each character in the string. For each character, check if it's printable. If it is, leave it. If not, replace it with an encoded representation. But how to encode them? Common methods are using hexadecimal (like \x0A) or similar escapes. But the user wants it to stay readable. Maybe using a substitution like caret notation (^J for newline) or something else.
+
+Wait, in Delphi, the user is dealing with a TMemo's Text property, which might have CRLF line endings (ASCII 13 and 10). So perhaps replacing CR and LF with a visible symbol like ¶ or ?, but those are non-ASCII. Alternatively, replace them with a text representation like \n or \r, but that's similar to C-style escapes. But since the user wants only printable ASCII, maybe using backslash codes.
+
+For example, replace #13#10 (CRLF) with "\n", and other non-printables with \xHH where HH is the hex code. But need to make sure that the replacement doesn't introduce non-printable characters. The backslash is ASCII 92, which is printable. So that's okay.
+
+But maybe the user wants to keep common whitespace like tabs (ASCII 9) as is? Or encode them too. Hmm. Need to clarify, but the user said "non-printable" so maybe encode anything below 32 except maybe space (32). So space is kept, others below 32 are encoded.
+
+So, steps:
+
+1. Iterate through each character in the input string.
+2. For each character, check if it's in the printable range (32 <= Ord(c) <= 126).
+3. If printable, append as-is.
+4. If not, replace with an escape sequence. For example, \x0A for LF (10), \x0D for CR (13), etc.
+5. Also, handle common characters with specific escape codes, like \n for LF, \r for CR, \t for tab. That might make it more readable than hex codes.
+
+Wait, but if we use \n, that's two characters: backslash and n. So when decoding, we'd replace \n with LF. But during encoding, replacing LF with \n would make the string more readable. Similarly for CR, tab, etc. So maybe first check if the non-printable character is one of the common ones (like LF, CR, Tab, Backspace, etc.) and use their respective escape codes, otherwise use \xHH.
+
+But how to implement that in Delphi.
+
+First, create a function that processes each character.
+
+For example:
+
+function EncodeNonPrintables(const S: string): string;
+var
+  i: Integer;
+  c: Char;
+  Escaped: string;
+begin
+  Result := '';
+  for i := 1 to Length(S) do
+  begin
+    c := S[i];
+    if (Ord(c) >= 32) and (Ord(c) <= 126) then
+      Result := Result + c
+    else
+    begin
+      case Ord(c) of
+        9: Escaped := '\t';  // Tab
+        10: Escaped := '\n'; // LF
+        13: Escaped := '\r'; // CR
+        34: Escaped := '\"'; // Double quote (though printable, but maybe escape quotes if needed)
+        92: Escaped := '\\'; // Backslash
+        else
+          Escaped := '\x' + IntToHex(Ord(c), 2);
+      end;
+      Result := Result + Escaped;
+    end;
+  end;
+end;
+
+But wait, the user might want to avoid escaping quotes unless necessary. Also, the backslash itself should be escaped to prevent ambiguity when decoding. Otherwise, if a backslash is in the original string, it would be kept as is, but when decoding, a backslash followed by a letter would be treated as an escape. So escaping backslashes is necessary.
+
+But this adds more escaping. Alternatively, the user may prefer to only escape non-printables, and leave existing backslashes as-is, but that could lead to issues when decoding. For example, if the original string has a backslash followed by 'n', it would look like an escaped newline. So maybe the function should also escape backslashes.
+
+Alternatively, the user may accept that, but to make the encoding reversible, we need to escape any existing backslashes in the original string. So in the encoding function, replace any backslash with \\ first, then handle non-printables.
+
+But let's think about decoding. When decoding, any \xHH would be replaced with the corresponding character, and \n, \r, \t with their respective ASCII codes. So during encoding, we need to escape backslashes, so that a literal backslash is represented as \\, and other escapes are properly represented.
+
+Wait, in the code above, the case for 92 (backslash) would replace it with \\, so that when decoding, a single backslash can be properly handled. Yes. That way, any backslash in the original string is escaped as \\, and the escape sequences like \n are replaced as LF. So the order is important: in the case statement, check for backslash first, then others.
+
+So the function would replace:
+
+- Tab (9) ? \t
+- LF (10) ? \n
+- CR (13) ? \r
+- Backslash (92) ? \\
+- Other non-printables ? \xHH
+
+But what about characters like BEL (7), which is non-printable. They would be replaced with \x07.
+
+This approach would make the encoded string mostly readable, with common escapes, and others as hex codes. The user can then take this string, which is a single line (since newlines are replaced with \n or \r\n, depending on how the original was), and it contains only printable ASCII.
+
+But in Delphi, when you have a TMemo.Text, the line breaks are CRLF (#13#10) on Windows. So in the example above, each CR and LF would be replaced with \r and \n. So a CRLF pair would become \r\n, which is two escape sequences. Alternatively, maybe combine them into a single \n, but that depends on the user's preference.
+
+Wait, in the code above, each CR and LF is replaced with \r and \n, so a CRLF becomes \r\n. That's correct. When decoding, the user would have to replace \r\n back to CRLF. But maybe during encoding, we can check if a CR is followed by a LF and replace them with \n, but that complicates things. Alternatively, leave as separate \r and \n.
+
+But the user's main goal is to make the string a single line (no actual newlines) but keep it readable. So replacing CR and LF with \r and \n would turn the multiline string into a single line with escape sequences. That should meet the requirement.
+
+So the function as outlined would work. Then, to decode, you'd need a function that parses the escape sequences.
+
+For decoding, the process is more complex. Need to scan the string for backslashes, then check the next character(s) to determine the replacement.
+
+For example:
+
+function DecodeNonPrintables(const S: string): string;
+var
+  i: Integer;
+  c: Char;
+  HexStr: string;
+  Code: Integer;
+begin
+  Result := '';
+  i := 1;
+  while i <= Length(S) do
+  begin
+    c := S[i];
+    if c = '\' then
+    begin
+      Inc(i);
+      if i > Length(S) then
+        Break; // malformed, but handle gracefully
+      c := S[i];
+      case c of
+        't': Result := Result + #9;
+        'n': Result := Result + #10;
+        'r': Result := Result + #13;
+        '\': Result := Result + '\';
+        'x':
+          begin
+            // Handle \xHH
+            if i + 2 > Length(S) then
+              Break; // malformed
+            HexStr := Copy(S, i+1, 2);
+            Inc(i, 2);
+            if TryStrToInt('$' + HexStr, Code) then
+              Result := Result + Chr(Code)
+            else
+              Result := Result + '\x' + HexStr; // invalid hex, leave as-is?
+          end;
+        else
+          // Unknown escape, treat as literal?
+          Result := Result + '\' + c;
+      end;
+      Inc(i);
+    end else
+    begin
+      Result := Result + c;
+      Inc(i);
+    end;
+  end;
+end;
+
+This decoding function handles \t, \n, \r, \\, and \xHH. Other escape sequences would be treated as literal characters (e.g., \b becomes \b), which might not be desired. But for the scope of the problem, this could suffice.
+
+But there are edge cases. For example, if the input has a \x followed by non-hex digits, the decoding function might not handle it correctly. But this is a basic implementation.
+
+The user can then use EncodeNonPrintables to convert the TMemo.Text into a single-line string with escape sequences, and DecodeNonPrintables to revert it back.
+
+Testing this with a string like 'Hello'#13#10'World' would encode to 'Hello\r\nWorld', which is a single line. When decoded, it would restore the CRLF and split into two lines again.
+
+Another example: a tab character in the string would become \t, which is more readable than \x09.
+
+So this approach should meet the user's requirement of keeping the text as readable as possible by encoding only non-printable characters with simple escape sequences, while keeping printable ASCII as-is.
+
+Possible improvements: handle other common escape sequences like \b for backspace, \f for form feed, etc., but the core idea remains the same.
+
+Thus, the solution involves creating two functions: one for encoding non-printables with escapes, and another for decoding. The encoding function checks each character and replaces non-printables with appropriate escape sequences, using \xHH for those without a shorthand. The decoding function parses these escapes and converts them back to their original characters.
