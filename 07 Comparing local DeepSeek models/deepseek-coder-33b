@@ -1,0 +1,89 @@
+Q> I have a multiline string containing newline ASCII characters (TMemo.Text). I want to change it to a single-line string with only printable ASCII characters. I could do that with BASE64 encoding, for example. I would, however, like to keep the text as much readable as possible by "encoding" only non-printable characters. Is there a simple way to do that?
+
+A> Yes, you can certainly achieve this in Delphi. It's fairly straightforward. Here is an example using a simple substitution method where we replace all non-printable ASCII characters with their hexadecimal representation prefixed by the backslash character (\). 
+
+This will not result in readable text but it will preserve the original string in such a way that the encoded and decoded versions can be compared directly.
+
+Below is an example of how you could do this:
+
+```delphi
+function EncodeNonPrintables(const InputString: String): String;
+var
+  i, j: Integer;
+begin
+  SetLength(Result, Length(InputString) * 2); // Worst case scenario
+  
+  j := 0;
+  for i := 1 to Length(InputString) do begin
+    if (Ord(InputString[i]) < 32) or (Ord(InputString[i]) > 126) then begin
+      // Non-printable character, replace it with '\x' followed by its hex value.
+      Result[j] := Format('\x%2.2X', [Ord(InputString[i])]);
+      Inc(j, 4);
+    end else begin
+      // Printable character, copy as is.
+      Result[j] := InputString[i];
+      Inc(j);
+    end;
+  end;
+  
+  SetLength(Result, j); // Trim the result string to its actual length.
+end;
+
+function DecodeNonPrintables(const EncodedInput: String): String;
+var
+  i, j: Integer;
+begin
+  SetLength(Result, Length(EncodedInput)); // Worst case scenario
+  
+  i := 1;
+  j := 0;
+  while i <= Length(EncodedInput) do begin
+    if (i < Length(EncodedInput)) and (EncodedInput[i] = '\') and (EncodedInput[i+1] = 'x') then begin
+      // This is an encoded non-printable character, decode it.
+      Result[j] := Chr(StrToInt('$' + Copy(EncodedInput, i+2, 2)));
+      Inc(i, 4);
+    end else begin
+      // Not a special case, copy as is.
+      Result[j] := EncodedInput[i];
+      Inc(i);
+    end;
+    Inc(j);
+  end;
+  
+  SetLength(Result, j); // Trim the result string to its actual length.
+end;
+```
+In the above code:
+- The `EncodeNonPrintables` function iterates over the input string character by character and replaces non-printable characters with their hexadecimal representation (prefixed by '\x').
+- In the `DecodeNonPrintables` function, we detect encoded non-printable characters by checking for occurrences of '\x' followed by two hexadecimal digits. 
+
+This method will ensure that all control characters and extended ASCII characters are replaced with their hexadecimal representation, while other printable characters remain unchanged.
+
+--------------------
+Q> How can I copy text to clipboard in a Delphi Firemonkey application?
+
+A> In a Delphi FireMonkey application, you can use the `Clipboard` service from the `FMX.Platform` unit to interact with the system clipboard. Here's an example of how you might copy some text to the clipboard:
+
+```delphi
+uses FMX.Platform;
+
+procedure CopyToClipboard(const Text: string);
+var
+  ClipboardService: IFMXClipboardService;
+begin
+  if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, IInterface(ClipboardService)) then
+    ClipboardService.SetClipboard(Text);
+end;
+```
+
+The `CopyToClipboard` function first checks if the system's platform services support a clipboard service. If they do, it then sets the clipboard to contain the specified text.
+
+You would use this function like so:
+
+```delphi
+CopyToClipboard('Hello, world!');
+```
+
+This will place the string 'Hello, world!' on your system's clipboard, which you can paste elsewhere (such as into a web browser or a word processor). 
+
+Please note that this functionality might not work in the Delphi IDE due to security restrictions. You need to run the application outside of the IDE for this to work.

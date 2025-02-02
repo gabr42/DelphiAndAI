@@ -1,0 +1,176 @@
+Q> I have a multiline string containing newline ASCII characters (TMemo.Text). I want to change it to a single-line string with only printable ASCII characters. I could do that with BASE64 encoding, for example. I would, however, like to keep the text as much readable as possible by "encoding" only non-printable characters. Is there a simple way to do that?
+
+A>  Certainly! You can create a custom encoding scheme to convert non-printable ASCII characters to printable ones while keeping the rest of the string intact. One straightforward approach is to use a mapping where each non-printable character (or range of characters) is replaced with a specific printable ASCII character or sequence. Here's an example implementation in Delphi:
+
+```delphi
+uses
+  SysUtils, StrUtils;
+
+function EncodeNonPrintable(const S: string): string;
+var
+  I: Integer;
+begin
+  Result := '';
+  for I := 1 to Length(S) do
+  begin
+    case Ord(S[I]) of
+      0..31, 127: // Non-printable ASCII characters (including control codes and DEL)
+        Result := Result + Format('\x%2.2X', [Ord(S[I])]);
+      else
+        Result := Result + S[I];
+    end;
+  end;
+end;
+
+function DecodeNonPrintable(const S: string): string;
+var
+  I: Integer;
+  HexValue: Integer;
+begin
+  Result := '';
+  I := 1;
+  while I <= Length(S) do
+  begin
+    if (S[I] = '\') and (Length(S) >= I + 2) then
+    begin
+      HexValue := StrToInt('$' + Copy(S, I + 1, 2));
+      Result := Result + Chr(HexValue);
+      Inc(I, 3); // Skip the \xHH part
+    end
+    else
+    begin
+      Result := Result + S[I];
+      Inc(I);
+    end;
+  end;
+end;
+
+procedure TForm1.Button1Click(Sender: TObject);
+var
+  MemoText, EncodedText, DecodedText: string;
+begin
+  MemoText := Memo1.Text;
+  EncodedText := EncodeNonPrintable(MemoText);
+  ShowMessage('Encoded Text: ' + EncodedText);
+  DecodedText := DecodeNonPrintable(EncodedText);
+  ShowMessage('Decoded Text: ' + DecodedText);
+end;
+```
+
+### Explanation:
+1. **EncodeNonPrintable**: This function iterates through each character in the input string `S`. If a character is non-printable (ASCII code between 0 and 31 or 127), it replaces it with a formatted string representing the ASCII code in hexadecimal (`\xHH`).
+
+2. **DecodeNonPrintable**: This function reverses the process. It looks for `\xHH` sequences and converts them back to their corresponding characters.
+
+3. **Button1Click**: An example event handler that demonstrates how to use these functions with a button click in a Delphi form.
+
+### Usage:
+- Call `EncodeNonPrintable` on your multiline string from the memo or any other source.
+- The encoded string will replace non-printable characters with their hexadecimal representations.
+- To decode, simply call `DecodeNonPrintable` on the encoded string.
+
+This method ensures that non-printable characters are made visible while keeping the rest of the text intact and readable.
+
+--------------------
+Q> How can I copy text to clipboard in a Delphi Firemonkey application?
+
+A>  Copying text to the clipboard in a Delphi FireMonkey (FMX) application involves using the platform-specific APIs provided by each target platform (e.g., Windows, macOS, iOS, Android). Below is an example of how you can achieve this across multiple platforms.
+
+### Using FMX.Clipboard
+
+Delphi's FireMonkey framework provides a `TClipboard` class that abstracts clipboard operations. You can use the `SetText` method to copy text to the clipboard and the `GetText` method to retrieve it.
+
+Here's an example of how to copy text to the clipboard in a FMX application:
+
+```delphi
+uses
+  System.SysUtils, FMX.Clipboard, FMX.Forms;
+
+procedure TForm1.CopyToClipboardButtonClick(Sender: TObject);
+var
+  ClipboardService: IFMXClipboardService;
+begin
+  if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, IInterface(ClipboardService)) then
+  begin
+    ClipboardService.SetText('Your text to copy');
+    ShowMessage('Text copied to clipboard!');
+  end
+  else
+  begin
+    ShowMessage('Clipboard service not available on this platform.');
+  end;
+end;
+```
+
+### Platform-Specific Implementations
+
+While the `TClipboard` class provides a unified way to interact with the clipboard, you might need to handle specific platforms differently. For example, on macOS and iOS, you might use the native APIs provided by those platforms.
+
+Here's an example for macOS:
+
+```delphi
+uses
+  Macapi.AppKit, FMX.Forms;
+
+procedure TForm1.CopyToClipboardButtonClick(Sender: TObject);
+var
+  Pasteboard: NSPasteboard;
+begin
+  Pasteboard := TNSPasteboard.Wrap(TNSPasteboard.OCClass.generalPasteboard);
+  Pasteboard.setString_forType('Your text to copy', NSStringUTTypePlainText);
+  ShowMessage('Text copied to clipboard!');
+end;
+```
+
+And for iOS:
+
+```delphi
+uses
+  iOSapi.UIKit, FMX.Forms;
+
+procedure TForm1.CopyToClipboardButtonClick(Sender: TObject);
+var
+  Pasteboard: UIPasteboard;
+begin
+  Pasteboard := TUIPasteboard.Wrap(TUIPasteboard.OCClass.generalPasteboard);
+  Pasteboard.setString(StrToNSStr('Your text to copy'));
+  ShowMessage('Text copied to clipboard!');
+end;
+```
+
+### Handling Multiple Platforms
+
+You can also use conditional compilation to handle different platforms:
+
+```delphi
+uses
+  System.SysUtils, FMX.Clipboard, FMX.Forms, FMX.Platform, FMX.Platform.iOS, FMX.Platform.Mac;
+
+procedure TForm1.CopyToClipboardButtonClick(Sender: TObject);
+var
+  ClipboardService: IFMXClipboardService;
+begin
+  if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, IInterface(ClipboardService)) then
+  begin
+    #if defined(MACOS) or defined(IOS)
+    var Pasteboard := TUIPasteboard.Wrap(TUIipasteboard.OCClass.generalPasteboard);
+    Pasteboard.setString('Your text to copy');
+    #else
+    ClipboardService.SetText('Your text to copy');
+    #endif
+    ShowMessage('Text copied to clipboard!');
+  end
+  else
+  begin
+    ShowMessage('Clipboard service not available on this platform.');
+  end;
+end;
+```
+
+### Summary
+
+- Use `TClipboard` in a cross-platform manner.
+- Implement specific handling for each target platform using native APIs if needed.
+- Consider conditional compilation to handle different platforms effectively.
+
+By following these steps, you can copy text to the clipboard in a Delphi FireMonkey application across multiple platforms.
