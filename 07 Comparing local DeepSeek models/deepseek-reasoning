@@ -1,0 +1,132 @@
+Q> How can I copy text to clipboard in a Delphi Firemonkey application?
+
+A> To copy text to the clipboard in a Delphi FireMonkey application, follow these steps:
+
+1. **Add the Clipboard Unit**: Include `FMX.Clipboard` in the `uses` clause of your unit.
+
+2. **Use the Default Clipboard Instance**: Access the clipboard via `TClipboard.Default` and call `SetText` with the desired string.
+
+**Example Code**:
+
+```delphi
+uses
+  FMX.Clipboard; // Include the clipboard unit
+
+procedure TForm1.CopyTextToClipboard(const AText: string);
+begin
+  if Assigned(TClipboard.Default) then
+    TClipboard.Default.SetText(AText);
+end;
+```
+
+**Usage**:
+
+```delphi
+// Copy text from a TEdit component
+CopyTextToClipboard(Edit1.Text);
+```
+
+**Explanation**:
+
+- **Cross-Platform Support**: The `TClipboard` class in FireMonkey abstracts platform-specific details, making it work on Windows, macOS, iOS, and Android.
+- **Default Instance**: `TClipboard.Default` provides a singleton instance of the clipboard, managed by the framework.
+- **Safety Check**: The `Assigned` check ensures the clipboard service is available, though it's typically unnecessary on supported platforms.
+
+**Reading Text from Clipboard** (Bonus):
+
+```delphi
+var
+  ClipboardText: string;
+begin
+  if Assigned(TClipboard.Default) then
+    ClipboardText := TClipboard.Default.GetText;
+end;
+```
+
+This approach is concise and leverages FireMonkey's built-in clipboard handling for seamless cross-platform functionality.
+
+R> Okay, so I need to figure out how to copy text to the clipboard in a Delphi FireMonkey application. Let's see... I remember that in VCL applications, you can use the Clipboard unit and do something like Clipboard.AsText := 'Some text'; but FireMonkey might be different because it's cross-platform.
+
+Wait, FireMonkey doesn't use the same Clipboard unit as VCL, right? Because FireMonkey targets multiple platforms, including mobile, so the approach must be platform-agnostic or use interfaces. Maybe there's a service or a helper class in FireMonkey for clipboard operations.
+
+I think FireMonkey has a TClipboard class. Let me check. Oh yes, FireMonkey.Clipboard. There's a TClipboard class that you can use. So perhaps you get the default clipboard instance and then set the text. Something like:
+
+uses FMX.Clipboard;
+
+...
+
+var
+  ClipboardService: IFMXClipboardService;
+begin
+  if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, ClipboardService) then
+    ClipboardService.SetClipboard('My text');
+end;
+
+Wait, but maybe there's a simpler way. In newer Delphi versions, maybe they have a helper function or a class method. Oh right, there's a TClipboard class with a Default instance. So maybe:
+
+uses FMX.Clipboard;
+
+...
+
+Clipboard.Clipboard.SetText('Text to copy');
+
+Wait, but the exact syntax might be different. Let me think. The TClipboard class has a SetText method, but how do you get the instance? Maybe through the default clipboard. Alternatively, using the service approach as before.
+
+Alternatively, in recent Delphi versions, maybe there's a static method or a singleton. For example, in FMX applications, you can use:
+
+var
+  MyClipboard: TClipboard;
+begin
+  MyClipboard := TClipboard.Create;
+  try
+    MyClipboard.SetText('Text');
+  finally
+    MyClipboard.Free;
+  end;
+end;
+
+But that doesn't seem right because the clipboard is a system service and you shouldn't create instances. Probably, you should use the default clipboard instance. Wait, maybe the TClipboard class has a class property called Default. So:
+
+TClipboard.Default.SetText('Text');
+
+Yes, that sounds familiar. Let me check the documentation. In FireMonkey, starting from a certain version (maybe XE5 or later), the TClipboard class has a Default property that provides access to the clipboard. So the code would be:
+
+uses
+  FMX.Clipboard;
+
+...
+
+procedure TForm1.Button1Click(Sender: TObject);
+begin
+  if TClipboard.Default <> nil then
+    TClipboard.Default.SetText('Hello, Clipboard!');
+end;
+
+But do I need to check if Default is assigned? Maybe in some cases, but generally, it's safe to assume that the clipboard service is available on supported platforms. Alternatively, using the service approach:
+
+var
+  ClipboardService: IFMXClipboardService;
+begin
+  if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, IInterface(ClipboardService)) then
+    ClipboardService.SetClipboard('Text here');
+end;
+
+But that's more verbose. The TClipboard.Default approach is probably the recommended way now. Also, when setting text, maybe there's a need to handle different platforms, but I think the TClipboard class abstracts that.
+
+Another thing to consider: permissions. On mobile platforms, accessing the clipboard might require certain permissions, but generally, copying text should work without extra steps.
+
+So the answer would involve using the TClipboard.Default.SetText method. Also, ensuring that the FMX.Clipboard unit is included in the uses clause. Let me verify with an example. Suppose I have a button click event handler:
+
+procedure TForm1.CopyButtonClick(Sender: TObject);
+begin
+  TClipboard.Default.SetText(Edit1.Text);
+end;
+
+That should copy the text from Edit1 to the clipboard. Yes, that seems right. So the steps are:
+
+1. Add FMX.Clipboard to the uses clause.
+2. Call TClipboard.Default.SetText('your text').
+
+No need to create or free the clipboard object since Default is a singleton managed by the framework.
+
+I should also mention that for reading text, you use GetText, but the question was about copying, so setting the text is sufficient. Also, note that on some platforms, like iOS, the clipboard might have some restrictions, but for most cases, this method works.
