@@ -1,0 +1,92 @@
+You are an experienced technical writer that knows Delphi programming language and the concepts of designing multithreaded applications.
+
+You are writing a blog article about the ComputeCore unit (https://github.com/gabr42/ComputeCore/blob/main/ComputeCore.pas). It should be written in the tone of voice that is generally used at the https://thedelphigeek.com blog and should encompass all of the following talking points:
+
+Goals
+•	Be able to run (computationally intensive) tasks
+•	Tasks can spawn other tasks
+•	Simple interface
+
+Implementation choices
+•	No return value
+•	No cancellation
+
+Top-level view
+•	One singleton GlobalComputeCore: IComputeCore
+•	By default it is automatically created on first use with CPUCount-1 worker threads
+•	To override, create it in advance: GlobalComputeCore := TComputeCore.Create(numThreads)
+•	IComputeCore is thread-safe and can be (and is) called from any worker thread
+•	Simple public interface
+•	function Run(const taskProc: TProc): ITask; overload;
+•	procedure WaitFor(const task: ITask);
+•	For compatibility with the PPL, there are ITask and TTask
+•	They mostly just call into GlobalComputeCore
+•	TTask.Run creates GlobalComputeCore on the fly first (if not already created)
+•	Optimistic initialization (http://www.omnithreadlibrary.com/book/chap08.html#synch-initialization-optimistic for more info)
+•	You could create multiple compute cores but then you would not be able to use TTask.Run and TTask.WaitFor
+
+Data structures in IComputeCore
+•	One array (preallocated to num worker threads) to own worker TThread objects (FThreads)
+•	One array (preallocated to num worker threads) to store inactive threads, used as a (FInactiveThreads)
+•	A queue of tasks to be executed (FTasks)
+
+Access to shared data
+•	When dealing with multithreaded programs it is important to protect data that can be access from multiple threads at the same time
+•	Protected with a Monitor (MonitorEnter(Self)/MonitorExit(Self))
+•	As little shared access as possible
+•	Visual separation between safe methods (that acquire exclusive access internally) and unsafe methods (that expect exclusive access to be already established); the latter end in “_U”
+•	Protected access is needed to access task queue and inactive threads array
+•	FThreads is only access from constructor and destructor and doesn’t require protected access
+
+Running a task
+•	Task is put into FTasks queue
+•	If an inactive thread can be found, it is removed from the FInactiveThreads array and signaled to begin work
+•	Otherwise, nothing special happens. Task will be executed when one of the worker threads finishes the previous task
+
+Worker threads
+•	Each worker thread runs a simple loop
+
+```  while (not Terminated) and (FSignal.WaitFor <> wrTimeout) do begin
+    while (not Terminated) and FOwner_ref.AllocateTask(Self, task) do
+      task.Execute;
+  end;
+```
+•	If there is no work to be done it waits for the FSignal to be triggered
+•	When there is work to be done, it processes tasks; after that, it goes back to the previous state
+
+Race conditions
+•	When dealing with multithreaded programs it is also important to think about critical parts of the code being executed in parallel. In this case, critical parts are related to accessing shared data structures.
+•	IOW, we want to think about what happens when a task is being scheduled at the same time as another task finishes execution.
+•	If we are not careful, it could happen that a task would be put into the internal task queue, but none of the threads would start working on it.
+•	That is why AllocateTask does more than one job from the locked area - it tries to get a task to be processed (with GetTask_U) and then marks the worker thread either active or inactive given the result of the GetTask_U (`MarkThreadActive_U`) 
+•	If we would split this operation into two separate critical sections, that would create a possible race condition
+
+Preventing resource exhaustion
+•	With this approach it is easy to exhaust all worker threads and deadlock the code - if a task executes a nested task which does the same and that repeats recursively for more than CPUCount levels, all worker threads would be busy with waiting on tasks to complete and no threads would be available to process remaining child tasks
+•	This is something that easily happens in QuickSort which is exactly the scenario this compute pool was developed for
+•	Solution: While waiting for a task to complete, grab tasks from the task queue and execute them. This happens in `TComputeCore.WaitFor`
+```  while task.WorkDone.WaitFor(0) = wrTimeout do begin
+    __Acquire;
+    GetTask_U(newTask);
+    __Release;
+    if not assigned(newTask) then
+      TThread.Yield
+    else begin
+      newTask.Execute;
+      if assigned(newTask.ExceptObj) then
+        raise Exception(newTask.ExceptObj);
+    end;
+  end;
+```
+
+Unit testing
+•	Let’s talk about unit testing in a separate article
+
+Conclusion
+•	It is not that hard to write your own parallel processing framework if you follow these rules:
+•	Keep it simple!
+•	Minimize access to shared data structures!
+•	Think about race conditions!
+•	Do lots of testing!
+
+Please write this article.
