@@ -1,0 +1,138 @@
+I need a prompt for Claude Code to analyze larger Delphi project for bugs of all kinds - from simple copy&paste bugs to multithreading issues.
+ 
+///
+
+Here's a prompt structured to find bugs at multiple scales without becoming a generic "review my code" exercise that produces vague output:
+
+---
+
+```
+Audit this Delphi codebase for bugs. Not style, not "could be cleaner" — actual 
+defects that will or could cause incorrect behavior, crashes, leaks, or data 
+corruption. Work through the categories below. For each finding produce: 
+file:line, the buggy code (just enough context to see it), the failure mode 
+(what goes wrong, when, and how visible it is), and a suggested fix.
+
+Prioritize HIGH-CONFIDENCE findings. If you're guessing, say so explicitly or 
+omit it. I'd rather have 20 real bugs than 200 maybes.
+
+1. RESOURCE AND MEMORY LIFECYCLE
+   - Objects created without try/finally protecting Free
+   - try/finally where the protected object isn't the one being freed 
+     (classic copy-paste bug: created A, freeing B)
+   - Double-free patterns; Free followed by use
+   - FreeAndNil missing where the field is reused
+   - Interface/object reference confusion (calling Free on an interface var, 
+     or .Create returning an interface but assigned to TObject)
+   - File handles, streams, registry keys, GDI handles, criticalsections, 
+     events not paired with their cleanup
+   - Owned vs non-owned containers — TObjectList<T> ownership flag wrong
+   - Components with Owner=nil never freed
+
+2. COPY-PASTE AND NEAR-DUPLICATE BUGS
+   - Adjacent blocks that are 95% identical — flag any place where the 
+     differing 5% looks suspicious (wrong index, wrong field, wrong variable)
+   - Loop bodies that reference the wrong loop variable (i where j was meant)
+   - Switch/case branches where one branch was clearly cloned and partially edited
+   - Boolean conditions where the "not" was forgotten on one side of a pair
+   - Off-by-one: <= vs <, Length vs High, 0-based vs 1-based mixups
+   - Assignment to the wrong field (Self.X := X where it should be Self.Y := Y)
+
+3. CONTROL FLOW AND LOGIC
+   - Unreachable code; conditions that are always true or always false
+   - Missing break/exit in case statements where it matters
+   - Exception swallowed (try ... except end with no body, or except on E do <nothing>)
+   - Exceptions raised inside finally that mask the original
+   - Early Exit/Break that skips required cleanup
+   - Result not assigned on all paths of a function
+   - Mixed Exit and assignment-to-Result with stale values
+
+4. THREADING AND CONCURRENCY (high priority — these are the silent killers)
+   - Shared mutable state accessed from multiple threads without synchronization
+   - TThread.Synchronize / Queue misuse, especially calls into freed objects
+   - Critical sections acquired in inconsistent orders (deadlock potential)
+   - Held locks across calls that may block or recursively acquire
+   - TMonitor on objects that are also used as keys/values
+   - Signal/event misuse — ResetEvent races, missed notifications
+   - InterlockedXxx used on values that aren't aligned or aren't Integer-sized
+   - Volatile reads/writes assumed without explicit barriers
+   - Lazy initialization without double-checked locking done correctly
+   - Thread-local storage assumed where it isn't
+   - Anonymous methods capturing loop variables (the captured-variable trap)
+   - TTask / TParallel.For with shared writes
+   - Code that runs in a worker thread but touches VCL directly
+   - Destruction races: object freed while a worker thread still references it
+
+5. ARITHMETIC AND TYPES
+   - Integer overflow in size/index calculations
+   - Signed/unsigned comparisons (W1073)
+   - Cardinal underflow (X-1 where X might be 0)
+   - Division without zero check
+   - Float comparisons with =, especially for accumulated values
+   - Currency/Double mixing where rounding matters
+   - String/AnsiString conversions that lose data (codepage assumptions)
+   - Char vs AnsiChar vs WideChar size assumptions
+
+6. STRING AND BUFFER HANDLING
+   - PChar to a temporary string (the string dies, the pointer dangles)
+   - StrPCopy/StrLCopy with size in chars vs bytes confusion
+   - SetLength followed by access beyond the new length
+   - Format/Sprintf argument count or type mismatches
+   - String indexing 0-based vs 1-based mistakes (especially post-XE)
+   - Mutating a string while another reference holds it (UniqueString missing)
+
+7. COLLECTIONS
+   - Modifying a list while enumerating it
+   - Capacity vs Count confusion
+   - Remove vs Delete vs Extract semantics wrong for ownership
+   - Dictionary key with mutable hash (object whose hash changes after insert)
+   - Sorted list invariant broken by direct edits
+
+8. EXCEPTION SAFETY
+   - Constructors that can raise after partial allocation without cleanup 
+     (Delphi auto-frees on constructor exception, but only if raised from 
+     the constructor's own frame — verify chained construction)
+   - Operator/property getters that raise (surprises callers)
+   - Finalization sections that depend on initialization having succeeded
+
+9. API CONTRACT VIOLATIONS
+   - Windows API return values not checked (especially HANDLE = 0 / 
+     INVALID_HANDLE_VALUE confusion)
+   - GetLastError called too late (after another API call has overwritten it)
+   - COM HRESULTs ignored
+   - Callbacks that don't preserve calling convention or that raise Delphi 
+     exceptions across non-Delphi frames
+
+10. DESIGN-LEVEL SMELLS THAT OFTEN HIDE BUGS
+    - God-methods (>200 lines) — flag for closer inspection rather than fix
+    - Duplicated logic across 3+ locations (one of them probably drifted)
+    - Public mutable state on classes that have any threading involvement
+    - Singletons accessed during finalization
+
+For each category, if you find nothing, say so explicitly — don't skip silently.
+
+Output format: group findings by category, within each category sort by 
+severity (crash/corruption > leak > wrong-result > latent). At the end, give 
+me the top 10 findings overall regardless of category — the ones I should 
+fix first.
+
+Audit only. Don't change any code.
+```
+
+---
+
+A few practical notes on running this against a larger codebase:
+
+**Chunk by responsibility, not by file count.** Group units that share state — a thread pool and its workers, a form and its data module, a parser and its lexer. Categories 4 and 7 (threading, collections) only produce useful findings when Claude can see both the producer and consumer side.
+
+**Run categories 1–3 broadly, run category 4 narrowly.** Resource lifecycle and copy-paste bugs Claude can find with surface-level analysis. Threading bugs require Claude to actually trace what runs where, which falls apart fast on large contexts. For threading, point Claude at one subsystem at a time and tell it which methods run on the main thread vs workers.
+
+**Feed Claude your conventions first.** "We use FreeAndNil consistently. We never use TThread.Synchronize, only TThread.Queue. Our event bus is GpEventBus and is thread-safe by design. Our `TGpObjectRingBuffer` is lock-free." This prevents Claude from flagging your idioms as bugs and lets it focus on actual deviations.
+
+**The "top 10 overall" instruction matters.** Without it, Claude will dump everything at uniform priority and you'll miss the three crash bugs in a sea of minor leaks. With it, you get a triage list.
+
+**For the second pass**, after you've fixed the top findings, run a *narrower* prompt: *"Given the fixes I just made (here are the diffs), are there other places in the codebase with the same pattern that I missed?"* Bugs cluster — finding one copy-paste bug almost always means there are more siblings.
+
+**What this prompt deliberately doesn't ask for:** performance review, architectural critique, naming/style. Those produce noise that drowns the actual bugs. Run them as separate passes if you want them.
+
+One realistic expectation: on a large codebase, even a careful pass will miss things. Threading bugs especially — Claude can flag suspicious patterns but can't prove their absence. Treat the output as "places worth looking at by a human who knows this code", not as a verdict.
